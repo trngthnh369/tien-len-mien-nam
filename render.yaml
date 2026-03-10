@@ -23,10 +23,12 @@ services:
           type: redis
           property: connectionString
 
+  - type: redis
+    name: tienlen-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
 databases:
   - name: tienlen-db
     plan: free
-
-  - name: tienlen-redis
-    plan: free
-    type: redis
