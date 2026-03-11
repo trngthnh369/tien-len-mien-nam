@@ -67,14 +67,62 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleDisconnect(client: Socket) {
     console.log(`[Room] Client disconnected: ${client.id}`);
     const user = (client as any).user;
-    if (user) {
-      const roomId = await this.redisService.getUserRoom(user.id);
-      if (roomId) {
-        await this.redisService.removeRoomSocket(roomId, client.id);
-        // Notify others in the room
-        this.server.to(roomId).emit('room:playerLeft', { userId: user.id, username: user.username });
+    if (!user) return;
+
+    const roomId = await this.redisService.getUserRoom(user.id);
+    if (!roomId) return;
+
+    await this.redisService.removeRoomSocket(roomId, client.id);
+
+    // Grace period: wait 5 seconds before removing from room
+    // This handles page refreshes and brief disconnections
+    setTimeout(async () => {
+      // Check if user reconnected (has a new socket in the room)
+      const sockets = await this.redisService.getRoomSockets(roomId);
+      const reconnected = sockets && sockets.length > 0 &&
+        await this.redisService.getUserRoom(user.id) === roomId;
+
+      // Check if user has any active socket connections to this room
+      const roomSockets = await this.server.in(roomId).fetchSockets();
+      const userReconnected = roomSockets.some(
+        (s: any) => s.data?.user?.id === user.id || (s as any).user?.id === user.id
+      );
+
+      if (!userReconnected) {
+        try {
+          // Remove player from DB (handles host transfer + room deletion)
+          await this.roomsService.leaveRoom(user.id, roomId);
+          // Clean up ready state
+          if (this.readyStates.has(roomId)) {
+            this.readyStates.get(roomId)!.delete(user.id);
+          }
+          // Notify remaining players
+          this.server.to(roomId).emit('room:playerLeft', {
+            userId: user.id,
+            username: user.username,
+          });
+          // Send updated room state to remaining players
+          try {
+            const room = await this.roomsService.getRoomDetailById(roomId);
+            this.server.to(roomId).emit('room:sync', {
+              room: {
+                id: room.id,
+                roomCode: room.roomCode,
+                roomName: room.roomName,
+                hostId: room.hostId,
+                status: room.status,
+                playerCount: room.playerCount,
+              },
+              players: room.players,
+            });
+          } catch {
+            // Room may have been deleted (last player left)
+          }
+        } catch (err) {
+          console.log(`[Room] Error cleaning up disconnect for ${user.username}:`, err);
+        }
       }
-    }
+    }, 5000); // 5 second grace period
   }
 
   /**
