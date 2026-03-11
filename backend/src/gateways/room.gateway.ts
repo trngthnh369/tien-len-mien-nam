@@ -52,16 +52,25 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     // Parse JWT manually since WsAuthGuard doesn't fire on connection
+    const token = client.handshake?.auth?.token;
+    if (!token) {
+      console.log(`[Room] Client ${client.id} rejected: no token`);
+      client.emit('room:error', { message: 'Token không được cung cấp' });
+      client.disconnect(true);
+      return;
+    }
+
     try {
-      const token = client.handshake?.auth?.token;
-      if (token) {
-        const { JwtService } = require('@nestjs/jwt');
-        const jwtService = new JwtService({ secret: process.env.JWT_SECRET || 'jwt_secret' });
-        const payload = jwtService.verify(token);
-        (client as any).user = { id: payload.sub, username: payload.username };
-      }
-    } catch {}
-    console.log(`[Room] Client connected: ${client.id}`);
+      const { JwtService } = require('@nestjs/jwt');
+      const jwtService = new JwtService({ secret: process.env.JWT_SECRET || 'jwt_secret' });
+      const payload = jwtService.verify(token);
+      (client as any).user = { id: payload.sub, username: payload.username };
+      console.log(`[Room] Client connected: ${client.id} (${payload.username})`);
+    } catch {
+      console.log(`[Room] Client ${client.id} rejected: invalid token`);
+      client.emit('room:error', { message: 'Token không hợp lệ' });
+      client.disconnect(true);
+    }
   }
 
   async handleDisconnect(client: Socket) {
