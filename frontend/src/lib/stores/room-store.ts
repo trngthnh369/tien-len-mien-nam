@@ -46,6 +46,7 @@ interface RoomState {
   addPlayer: (player: Player) => void;
   removePlayer: (userId: string) => void;
   setPlayerReady: (userId: string) => void;
+  setPlayerUnready: (userId: string) => void;
   setRoom: (room: Room | null) => void;
   setPlayers: (players: Player[]) => void;
   syncRoomState: (room: Room, players: Player[]) => void;
@@ -167,6 +168,13 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set((s) => ({
       players: s.players.map((p) =>
         p.userId === userId ? { ...p, isReady: true } : p,
+      ),
+    })),
+
+  setPlayerUnready: (userId: string) =>
+    set((s) => ({
+      players: s.players.map((p) =>
+        p.userId === userId ? { ...p, isReady: false } : p,
       ),
     })),
 

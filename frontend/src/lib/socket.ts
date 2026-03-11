@@ -32,8 +32,17 @@ class SocketManager {
     });
 
     // Full state sync — sent when any player joins, everyone gets updated player list with seats
+    // IMPORTANT: Preserve isReady state from existing players since server doesn't track it
     this.roomSocket.on('room:sync', (data: { room: any; players: any[] }) => {
-      useRoomStore.getState().syncRoomState(data.room, data.players);
+      const currentPlayers = useRoomStore.getState().players;
+      const mergedPlayers = (data.players || []).map((p: any) => {
+        const existing = currentPlayers.find(ep => ep.userId === p.userId);
+        return {
+          ...p,
+          isReady: existing?.isReady ?? false,
+        };
+      });
+      useRoomStore.getState().syncRoomState(data.room, mergedPlayers);
     });
 
     this.roomSocket.on('room:playerJoined', (data) => {
@@ -58,8 +67,12 @@ class SocketManager {
       });
     });
 
-    this.roomSocket.on('room:playerReady', (data) => {
-      useRoomStore.getState().setPlayerReady(data.userId);
+    this.roomSocket.on('room:playerReady', (data: { userId: string; isReady: boolean }) => {
+      if (data.isReady) {
+        useRoomStore.getState().setPlayerReady(data.userId);
+      } else {
+        useRoomStore.getState().setPlayerUnready(data.userId);
+      }
     });
 
     this.roomSocket.on('room:gameStarting', () => {

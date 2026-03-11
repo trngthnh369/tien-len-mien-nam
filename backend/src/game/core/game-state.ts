@@ -22,12 +22,14 @@ export function initGameState(
   roomId: string,
   players: Array<{ userId: string; username: string; seat: number }>
 ): GameState {
-  if (players.length !== MAX_PLAYERS) {
-    throw new Error(`Game requires exactly ${MAX_PLAYERS} players, got ${players.length}`);
+  if (players.length < 2 || players.length > MAX_PLAYERS) {
+    throw new Error(`Game requires 2-${MAX_PLAYERS} players, got ${players.length}`);
   }
 
-  // Deal cards
-  const hands = dealCards(MAX_PLAYERS);
+  const numPlayers = players.length;
+
+  // Deal cards (distributes all 52 cards evenly among players)
+  const hands = dealCards(numPlayers);
 
   // Sort each hand for display
   const sortedHands = hands.map(hand => sortCards(hand));
@@ -41,7 +43,7 @@ export function initGameState(
     username: p.username,
     seat: p.seat,
     cards: sortedHands[i],
-    cardCount: CARDS_PER_PLAYER,
+    cardCount: sortedHands[i].length,
   }));
 
   return {
@@ -295,9 +297,12 @@ export function finalizeGame(state: GameState): GameResult[] {
  * @param forUserId - The player who should see their own cards
  * @returns Masked state safe to send to client
  */
-export function maskStateForPlayer(state: GameState, forUserId: string): GameState {
+export function maskStateForPlayer(state: GameState, forUserId: string): any {
+  const myPlayer = state.players.find(p => p.userId === forUserId);
   return {
     ...state,
+    // Top-level 'hand' field for easy access by frontend
+    hand: myPlayer ? myPlayer.cards : [],
     players: state.players.map(p => ({
       ...p,
       cards: p.userId === forUserId ? p.cards : [], // Hide other players' cards

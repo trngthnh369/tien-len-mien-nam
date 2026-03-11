@@ -51,6 +51,16 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   async handleConnection(client: Socket) {
+    // Parse JWT manually since WsAuthGuard doesn't fire on connection
+    try {
+      const token = client.handshake?.auth?.token;
+      if (token) {
+        const { JwtService } = require('@nestjs/jwt');
+        const jwtService = new JwtService({ secret: process.env.JWT_SECRET || 'jwt_secret' });
+        const payload = jwtService.verify(token);
+        (client as any).user = { id: payload.sub, username: payload.username };
+      }
+    } catch {}
     console.log(`[Room] Client connected: ${client.id}`);
   }
 
@@ -112,13 +122,39 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  // Track ready states in memory (not persisted to DB - ephemeral per session)
+  private readyStates = new Map<string, Set<string>>(); // roomId -> Set of ready userIds
+
   @SubscribeMessage('room:ready')
-  async handleReady(@ConnectedSocket() client: Socket) {
+  async handleReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { isReady?: boolean },
+  ) {
     const user = (client as any).user;
     const roomId = await this.redisService.getUserRoom(user.id);
-    if (roomId) {
-      this.server.to(roomId).emit('room:playerReady', { userId: user.id });
+    if (!roomId) return;
+
+    // Toggle or set ready state
+    if (!this.readyStates.has(roomId)) {
+      this.readyStates.set(roomId, new Set());
     }
+    const readySet = this.readyStates.get(roomId)!;
+    
+    let isReady: boolean;
+    if (data?.isReady !== undefined) {
+      isReady = data.isReady;
+    } else {
+      // Toggle
+      isReady = !readySet.has(user.id);
+    }
+
+    if (isReady) {
+      readySet.add(user.id);
+    } else {
+      readySet.delete(user.id);
+    }
+
+    this.server.to(roomId).emit('room:playerReady', { userId: user.id, isReady });
   }
 
   @SubscribeMessage('room:start')
