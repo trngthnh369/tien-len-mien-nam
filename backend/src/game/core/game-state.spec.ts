@@ -41,8 +41,13 @@ describe('GameState', () => {
     });
 
     it('should throw for wrong number of players', () => {
+      // 1 player (below minimum of 2)
       expect(() =>
-        initGameState('room1', PLAYERS.slice(0, 3)),
+        initGameState('room1', PLAYERS.slice(0, 1)),
+      ).toThrow();
+      // 5 players (above maximum of 4)
+      expect(() =>
+        initGameState('room1', [...PLAYERS, { userId: 'u5', username: 'Player5', seat: 4 }]),
       ).toThrow();
     });
 
@@ -220,25 +225,24 @@ describe('GameState', () => {
       const state = initGameState('room1', PLAYERS);
       const p1 = state.players.find((p) => p.userId === state.currentTurn)!;
 
-      // Find the highest card in p1's hand
-      const highCard = p1.cards[p1.cards.length - 1]; // sorted ascending
+      // First turn must include 3♠ — find it
+      const threeSpade = p1.cards.find(c => c.rank === '3' && c.suit === 'S')!;
 
-      // Play the high card
+      // Play 3♠ first
       const result1 = applyAction(state, {
         type: 'PLAY',
         userId: p1.userId,
-        cards: [highCard],
+        cards: [threeSpade],
       });
       expect(result1.state).toBeDefined();
       const afterPlay = result1.state as GameState;
 
-      // Next player tries to play a lower card
+      // Next player tries to play a 3 (which can't beat 3♠ unless higher suit)
       const p2 = afterPlay.players.find(
         (p) => p.userId === afterPlay.currentTurn,
       )!;
       const lowCard = p2.cards[0]; // lowest card
 
-      // Only test if lowCard is actually lower
       const result2 = applyAction(afterPlay, {
         type: 'PLAY',
         userId: p2.userId,
@@ -347,6 +351,7 @@ describe('GameState', () => {
       const state = initGameState('room1', PLAYERS);
 
       // Create a manually controlled state where players have few cards
+      // isFirstTurn: false because this simulates mid-game
       const controlled: GameState = {
         ...state,
         players: [
@@ -361,6 +366,7 @@ describe('GameState', () => {
         lastPlayedHand: null,
         passCount: 0,
         finishedOrder: [],
+        isFirstTurn: false,
       };
 
       // u1 plays A♥ (single)
@@ -404,6 +410,7 @@ describe('GameState', () => {
         passCount: 0,
         finishedOrder: ['u1', 'u2'],
         roundNumber: 5,
+        isFirstTurn: false,
         startedAt: new Date().toISOString(),
       };
 
@@ -515,6 +522,7 @@ describe('GameState', () => {
         passCount: 0,
         finishedOrder: ['u2', 'u3', 'u1', 'u4'],
         roundNumber: 10,
+        isFirstTurn: false,
         startedAt: new Date().toISOString(),
       };
 

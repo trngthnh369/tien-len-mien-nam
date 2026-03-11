@@ -116,8 +116,8 @@ export function validateHand(cards: Card[]): HandType | null {
     }
   }
 
-  // 6. Consecutive Pairs (3-4 consecutive pairs = 6 or 8 cards, no 2s)
-  if ((count === 6 || count === 8) && !containsTwo(sorted)) {
+  // 6. Consecutive Pairs (3-6 consecutive pairs = 6, 8, 10, or 12 cards, no 2s)
+  if (count >= 6 && count <= 12 && count % 2 === 0 && !containsTwo(sorted)) {
     const pairCount = count / 2;
     let isConsecutivePairs = true;
 

@@ -63,11 +63,10 @@ export function canCut(attacker: HandType, defender: HandType): boolean {
     return true;
   }
 
-  // Four of a Kind cuts Pair of 2s (house rule, commonly used)
-  // Uncomment if you want this rule:
-  // if (attacker.type === 'FOUR_OF_KIND' && isPair2(defender)) {
-  //   return true;
-  // }
+  // Four of a Kind cuts Pair of 2s (Tứ quý chặt đôi heo - luật chuẩn)
+  if (attacker.type === 'FOUR_OF_KIND' && isPair2(defender)) {
+    return true;
+  }
 
   return false;
 }

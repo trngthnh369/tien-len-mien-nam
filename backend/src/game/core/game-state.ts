@@ -57,6 +57,7 @@ export function initGameState(
     passCount: 0,
     finishedOrder: [],
     roundNumber: 1,
+    isFirstTurn: true, // Track first turn for 3♠ enforcement
     startedAt: new Date().toISOString(),
   };
 }
@@ -165,6 +166,11 @@ function handlePass(
   userId: string,
   playerIndex: number
 ): { state: GameState } | { error: string } {
+  // Cannot pass when table is empty (new round or first turn)
+  if (!state.lastPlayedHand) {
+    return { error: 'Bạn phải đánh bài khi bàn trống' };
+  }
+
   const newState = deepCloneState(state);
   newState.passCount += 1;
 
@@ -223,6 +229,14 @@ function handlePlay(
     return { error: 'Bộ bài không hợp lệ' };
   }
 
+  // First turn of the game: must include 3♠ (3 of Spades)
+  if (state.isFirstTurn) {
+    const has3Spade = cards.some(c => c.rank === '3' && c.suit === 'S');
+    if (!has3Spade) {
+      return { error: 'Lượt đầu tiên phải đánh lá 3♠' };
+    }
+  }
+
   // If table is not empty, compare with last played
   if (state.lastPlayedHand) {
     const beats = compareHands(hand, state.lastPlayedHand);
@@ -244,6 +258,7 @@ function handlePlay(
   newState.lastPlayedBy = userId;
   newState.lastPlayedHand = hand;
   newState.passCount = 0;
+  newState.isFirstTurn = false; // First turn rule no longer applies
 
   // Check if player finished (no cards left)
   if (newPlayer.cardCount === 0) {

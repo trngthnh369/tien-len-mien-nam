@@ -55,6 +55,7 @@ export interface GameState {
   passCount: number;
   finishedOrder: string[]; // userIds in order of finishing
   roundNumber: number;
+  isFirstTurn: boolean; // True until first card is played (enforce 3♠)
   startedAt: string; // ISO8601
   sessionId?: string; // DB session ID, set when game starts
 }
